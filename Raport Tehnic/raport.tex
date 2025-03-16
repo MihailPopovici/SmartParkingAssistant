@@ -1,0 +1,113 @@
+\documentclass[runningheads]{llncs}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{indentfirst}
+\usepackage{hyperref} 
+\usepackage{xurl}
+\usepackage{float}
+
+\title{Proiect - SmartParkingAssistant}
+
+\author{Mihail Popovici}
+\authorrunning{Mihail Popovici}
+\date{} % Fără dată
+\institute{Facultate de Informatică, Universitatea ,,Alexandru Ioan Cuza” din Iași}
+\begin{document}
+\maketitle
+
+\section{Introducere}
+\textbf{,,SmartParkingAssistant”} reprezintă o soluție în contextul problemei tot mai acute a gestionării eficiente a parcărilor, fiind conceput pentru a simplifica și optimiza procesul de identificare a locurilor de parcare în timp real. Astfel, se vor crea două aplicații (client/server); serverul propune simularea unei configurații inițiale a parcării, bazată pe senzori și camere inteligente, date ce vor fi furnizate ulterior aplicației client. 
+\par Printre obiectivele proiectului se numără simularea dezvoltarea unei interfețe simple și ușor de utilizat de către clienț, dar și crearea unui mediu dinamic, în care valabilitatea locurilor de parcare se actualizează constant și automat pe baza intrărilor și ieșirilor din parcare
+
+\section{Tehnologii Aplicate}
+În dezvoltarea acestui proiect s-a utilizat un server TCP concurent, ce creează un nou thread pentru fiecare client conectat. Motivația din spatele alegerii protocolului TCP se bazează pe integritatea datelor pe parcusul transmiterii acestora între aplicații. Astfel protocolul TCP se asigură ca toate pachetele ajung la destinație și niciun pachet nu este pierdut. În contextul de față, ne dorim ca statusul parcării și locul de parcare dorit de către client să fie transmise în mod corect, pentru a evita eventualele confuzii ce pot apărea dacă se corup datele pe drum. 
+
+\section{Structura Aplicației}
+Implementarea aplicației se împarte în două părți complementare:
+\\
+\par 1) \textbf{Clientul}: poate fi la rândul său de două tipuri:
+\par \textbf{Client de tipul 1: } acesta vine în parcare și transmite serverului dorința de a parca, furnizând totădată și numărul de înmatriculare al mașinii, ce va fi verificat pentru a se încadra în standarde. Ulterior, clientului îi este prezentat răspunsul de la server (imposibilitatea de a parca dacă parcarea este plină/număr de înmatriculare invalid/locul de parcare alocat, împreună cu cheia de identificare folosită pentru a-și scoate mașina din parcare).
+\par \textbf{Client de tipul 2: } acesta transmite serverului intenția de a ieși din parcare și cheia unică de identificare primită inițial de la server, ce trebuie să fie în conformitate cu structura generală a cheilor înainte de a fi trimisă către server. Dacă în urma verificărilor făcute de server cheia corespunde unei mașini din parcare, clientului îi este furnizat accesul la mașină, cât și locul de parcare pe care se găsește aceasta. 
+
+\par 2) \textbf{Serverul}: primește de la client tipul acestuia și numărul de înmatriculare/cheia de identificare. 
+\par În cazul clientului de tip 1, serverul se asigură de faptul că numărul furnizat nu aparține deja unei mașini aflate în parcare (deși este conceptual imposibil ca 2 mașini să aibă același număr de înmatriculare, se iau măsuri de siguranță împotriva introducerii greșite a acestuia, cât și a dorințelor rău intenționate ale unor utilizatori de a strica logica aplicației). Ulterior, după ce trece acest test, se verifică statusul curent al parcării și i se alocă un loc, dacă este posibil, urmând a se trimite înapoi către client rezultatul acestor operații. 
+\par În ceea ce privește clienții de tip 2, se verifică cheia furnizată pentru a fi a unei mașini din parcare, în caz afirmativ urmând a se oferi accesul clientului la mașină. Răspunsul este trimis către client, alături de locul de parcare unde îi este situată mașina. 
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{1\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/diagrama.png}
+        \caption{Diagrama aplicației}
+        \label{fig:diagrama}
+    \end{minipage}\hfill
+\end{figure}
+
+\section{Aspecte de implementare}
+
+Inițial, serverul va trimite clientului configurația curentă a parcării, a cărei stocare se face cu ajutorul unui vector, unde valoarea 0 semnifică faptul că locul respectiv liber, iar valoarea 1 că acel loc este ocupat. Extragerea ei se face folosind funcția din \textbf{Fig. 2}
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{1\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/parking_status.png}
+        \caption{Configurația parcării}
+        \label{fig:configurație}
+    \end{minipage}\hfill
+\end{figure}
+
+\par Așa cum a fost explicat și mai sus, inputul clientului trece printr-o serie de verificări înainte de a fi trimis către server, dar asta nu garantează că serverul nu poate considera anumite inputuri invalide. Astfel, se va analiza și răspunsul dat de server (\textbf{Fig 3.}).
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.75\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/client.png}
+        \caption{Client}
+        \label{fig:client}
+    \end{minipage}\hfill
+\end{figure}
+
+\par Generarea cheilor unice de identificare se face cu ajutorul unei funcții cunoscute de hashing, și anume djb2. Astfel, ne asigurăm că fiecarui număr de înmatriculare îi este atribuit un cod unic, asemenea unui pin, în absența căruia clientul nu poate avea acces la mașină, asigurând o măsură suplimentară de securitate. (\textbf{Fig 4.}).
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{1\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/hashing.png}
+        \caption{Hash function}
+        \label{fig:hashing}
+    \end{minipage}\hfill
+\end{figure}
+
+\par Modificările aduse asupra locurilor de
+parcare pot provoca probleme din punct de vedere al concurenței, astfel că protejăm accesul simultan la date cu ajutorul unui mutex(\textbf{Fig 5.})
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{1\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/mutex.png}
+        \caption{Mutex}
+        \label{fig:mutex}
+    \end{minipage}\hfill
+\end{figure}
+
+\section{Concluzii}
+Aplicația constituie în momentul acesta o soluție stabilă pentru problema adusă de proiect, însă poate beneficia de modificări și funcționalități noi. Una dintre acestea ar fi implementarea unei baze de date unde se va stoca configurația parcării, întrucât momentan valabilitatea locurilor de parcare este stocată local, pe server, aceasta fiind resetată de fiecare dată când este oprit serverul.   
+\section{Referințe bibliografice}
+\begin{enumerate}
+ \item \slshape{Cursul ,,Rețele de calculatoare”. A concurrent server that creates a thread for each connected client}. 
+ \url{https://edu.info.uaic.ro/computer-networks/files/NetEx/S12/ServerConcThread/servTcpConcTh2.c}
+ \item Laboratorul materiei ,,Rețele de calculatoare". Modelul Client/Server iterativ TCP.
+ \url{https://profs.info.uaic.ro/andrei.scutelnicu/teaching/ComputerNetworks/Lab6/Lab6.pdf}
+ \item Geeks for Geeks. \slshape{Thread functions in C/C++}
+ \url{https://www.geeksforgeeks.org/thread-functions-in-c-c/}
+ \item Wikipedia. ANSI escape code 
+ \url{https://en.wikipedia.org/wiki/ANSI_escape_code}
+ \item Geeks for Geeks. snprintf() in C
+ \url{https://www.geeksforgeeks.org/snprintf-c-library/}
+ 
+\end{enumerate}
+
+\end{document}
